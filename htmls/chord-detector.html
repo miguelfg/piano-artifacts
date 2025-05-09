@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detector de Acordes de Piano</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .piano {
+      display: flex;
+      position: relative;
+      margin: 40px 0;
+    }
+
+    .white-key {
+      width: 40px;
+      height: 150px;
+      background-color: white;
+      border: 1px solid #333;
+      border-radius: 0 0 5px 5px;
+      position: relative;
+      z-index: 1;
+      cursor: pointer;
+    }
+
+    .black-key {
+      width: 30px;
+      height: 90px;
+      background-color: black;
+      position: absolute;
+      z-index: 2;
+      border-radius: 0 0 5px 5px;
+      cursor: pointer;
+    }
+
+    .white-key.active {
+      background-color: #a9e6ff;
+    }
+
+    .black-key.active {
+      background-color: #0066cc;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .chord-display {
+      font-size: 24px;
+      margin-top: 20px;
+      padding: 10px 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      min-width: 200px;
+      text-align: center;
+      background-color: white;
+    }
+
+    .chord-notes {
+      font-size: 16px;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Detector de Acordes de Piano</h1>
+
+  <div class="chord-display">
+    <div id="chord-name">Pulsa algunas teclas</div>
+    <div id="chord-notes" class="chord-notes"></div>
+  </div>
+
+  <div class="piano" id="piano"></div>
+
+  <div class="controls">
+    <button id="check-chord">Identificar Acorde</button>
+    <button id="clear-keys">Limpiar Selección</button>
+  </div>
+
+  <script>
+    // Configuración del piano
+    const pianoKeys = [
+      { note: 'C', octave: 4, type: 'white', index: 0 },
+      { note: 'C#', octave: 4, type: 'black', index: 0 },
+      { note: 'D', octave: 4, type: 'white', index: 1 },
+      { note: 'D#', octave: 4, type: 'black', index: 1 },
+      { note: 'E', octave: 4, type: 'white', index: 2 },
+      { note: 'F', octave: 4, type: 'white', index: 3 },
+      { note: 'F#', octave: 4, type: 'black', index: 3 },
+      { note: 'G', octave: 4, type: 'white', index: 4 },
+      { note: 'G#', octave: 4, type: 'black', index: 4 },
+      { note: 'A', octave: 4, type: 'white', index: 5 },
+      { note: 'A#', octave: 4, type: 'black', index: 5 },
+      { note: 'B', octave: 4, type: 'white', index: 6 },
+      { note: 'C', octave: 5, type: 'white', index: 7 },
+      { note: 'C#', octave: 5, type: 'black', index: 7 },
+      { note: 'D', octave: 5, type: 'white', index: 8 },
+      { note: 'D#', octave: 5, type: 'black', index: 8 },
+      { note: 'E', octave: 5, type: 'white', index: 9 },
+      { note: 'F', octave: 5, type: 'white', index: 10 },
+      { note: 'F#', octave: 5, type: 'black', index: 10 },
+      { note: 'G', octave: 5, type: 'white', index: 11 },
+      { note: 'G#', octave: 5, type: 'black', index: 11 },
+      { note: 'A', octave: 5, type: 'white', index: 12 },
+      { note: 'A#', octave: 5, type: 'black', index: 12 },
+      { note: 'B', octave: 5, type: 'white', index: 13 }
+    ];
+
+    // Notas seleccionadas
+    let selectedNotes = [];
+
+    // Crear piano
+    function createPiano() {
+      const piano = document.getElementById('piano');
+
+      // Crear teclas blancas primero
+      const whiteKeys = pianoKeys.filter(key => key.type === 'white');
+      whiteKeys.forEach(key => {
+        const keyElement = document.createElement('div');
+        keyElement.className = 'white-key';
+        keyElement.dataset.note = key.note;
+        keyElement.dataset.octave = key.octave;
+        piano.appendChild(keyElement);
+
+        keyElement.addEventListener('click', () => toggleNote(keyElement));
+      });
+
+      // Luego crear teclas negras encima
+      const blackKeys = pianoKeys.filter(key => key.type === 'black');
+      blackKeys.forEach(key => {
+        const keyElement = document.createElement('div');
+        keyElement.className = 'black-key';
+        keyElement.dataset.note = key.note;
+        keyElement.dataset.octave = key.octave;
+
+        // Posicionar la tecla negra
+        const offset = key.index * 40 + 25;
+        keyElement.style.left = `${offset}px`;
+
+        piano.appendChild(keyElement);
+
+        keyElement.addEventListener('click', () => toggleNote(keyElement));
+      });
+    }
+
+    // Alternar selección de notas
+    function toggleNote(keyElement) {
+      const note = keyElement.dataset.note;
+      const octave = keyElement.dataset.octave;
+      const noteId = `${note}${octave}`;
+
+      if (keyElement.classList.contains('active')) {
+        keyElement.classList.remove('active');
+        selectedNotes = selectedNotes.filter(n => n !== noteId);
+      } else {
+        keyElement.classList.add('active');
+        selectedNotes.push(noteId);
+      }
+
+      // Actualizar visualización
+      document.getElementById('chord-notes').textContent = selectedNotes.length > 0 ?
+        `Notas: ${selectedNotes.map(formatNoteDisplay).join(', ')}` : '';
+    }
+
+    // Formatear nota para mostrar
+    function formatNoteDisplay(noteId) {
+      const note = noteId.slice(0, -1);
+      const octave = noteId.slice(-1);
+      return `${note}${octave}`;
+    }
+
+    // Identificar acorde
+    function identifyChord() {
+      if (selectedNotes.length === 0) {
+        document.getElementById('chord-name').textContent = 'Selecciona algunas teclas';
+        return;
+      }
+
+      // Normalizar notas (remover octavas para análisis de acordes)
+      const notesWithoutOctaves = selectedNotes.map(n => n.slice(0, -1));
+
+      // Ordenar notas para análisis
+      const sortedNotes = sortNotes([...new Set(notesWithoutOctaves)]);
+
+      // Encontrar la raíz y calidad del acorde
+      const { root, quality } = determineChord(sortedNotes);
+
+      // Mostrar resultado
+      document.getElementById('chord-name').textContent = root + quality;
+    }
+
+    // Ordenar notas según la secuencia musical
+    function sortNotes(notes) {
+      const noteOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      return notes.sort((a, b) => noteOrder.indexOf(a) - noteOrder.indexOf(b));
+    }
+
+    // Determinar el acorde basado en las notas
+    function determineChord(notes) {
+      if (notes.length === 0) return { root: '', quality: '' };
+      if (notes.length === 1) return { root: notes[0], quality: '' };
+
+      // Encontrar todos los posibles intervalos desde cada nota
+      for (let i = 0; i < notes.length; i++) {
+        const possibleRoot = notes[i];
+        const intervals = calculateIntervals(possibleRoot, notes);
+
+        // Comprobar acordes mayores
+        if (arraysEqual(intervals, [0, 4, 7])) {
+          return { root: possibleRoot, quality: ' Mayor' };
+        }
+        // Comprobar acordes menores
+        if (arraysEqual(intervals, [0, 3, 7])) {
+          return { root: possibleRoot, quality: ' menor' };
+        }
+        // Comprobar acordes disminuidos
+        if (arraysEqual(intervals, [0, 3, 6])) {
+          return { root: possibleRoot, quality: ' disminuido' };
+        }
+        // Comprobar acordes aumentados
+        if (arraysEqual(intervals, [0, 4, 8])) {
+          return { root: possibleRoot, quality: ' aumentado' };
+        }
+        // Comprobar séptimas mayores
+        if (arraysEqual(intervals, [0, 4, 7, 11])) {
+          return { root: possibleRoot, quality: ' Mayor 7' };
+        }
+        // Comprobar séptimas dominantes
+        if (arraysEqual(intervals, [0, 4, 7, 10])) {
+          return { root: possibleRoot, quality: ' 7' };
+        }
+        // Comprobar séptimas menores
+        if (arraysEqual(intervals, [0, 3, 7, 10])) {
+          return { root: possibleRoot, quality: ' menor 7' };
+        }
+        // Comprobar acordes suspendidos (sus4)
+        if (arraysEqual(intervals, [0, 5, 7])) {
+          return { root: possibleRoot, quality: ' sus4' };
+        }
+        // Comprobar acordes sus2
+        if (arraysEqual(intervals, [0, 2, 7])) {
+          return { root: possibleRoot, quality: ' sus2' };
+        }
+        // Comprobar acordes de sexta
+        if (arraysEqual(intervals, [0, 4, 7, 9])) {
+          return { root: possibleRoot, quality: ' 6' };
+        }
+        // Comprobar acordes menores de sexta
+        if (arraysEqual(intervals, [0, 3, 7, 9])) {
+          return { root: possibleRoot, quality: ' menor 6' };
+        }
+      }
+
+      // Si no se identifica un acorde específico
+      return { root: notes[0], quality: ' ?' };
+    }
+
+    // Calcular intervalos desde una nota raíz
+    function calculateIntervals(root, notes) {
+      const noteOrder = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const rootIndex = noteOrder.indexOf(root);
+
+      return notes.map(note => {
+        let interval = noteOrder.indexOf(note) - rootIndex;
+        if (interval < 0) interval += 12;
+        return interval;
+      }).sort((a, b) => a - b);
+    }
+
+    // Comparar dos arrays
+    function arraysEqual(a, b) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+      }
+      return true;
+    }
+
+    // Limpiar selección
+    function clearSelection() {
+      const keys = document.querySelectorAll('.white-key, .black-key');
+      keys.forEach(key => key.classList.remove('active'));
+      selectedNotes = [];
+      document.getElementById('chord-name').textContent = 'Pulsa algunas teclas';
+      document.getElementById('chord-notes').textContent = '';
+    }
+
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', () => {
+      createPiano();
+
+      document.getElementById('check-chord').addEventListener('click', identifyChord);
+      document.getElementById('clear-keys').addEventListener('click', clearSelection);
+    });
+  </script>
+</body>
+</html>
